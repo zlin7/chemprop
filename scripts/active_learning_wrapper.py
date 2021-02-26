@@ -26,7 +26,6 @@ class ActiveArgs(Tap):
     active_test_features_path: List[str] = None
     active_test_indices_path: str = None # path to pickle file containing a list of indices for the test set out of the whole data path
     initial_trainval_indices_path: str = None # path to pickle file containing a list of indices for data in data path
-    split_type: Literal['random'] = 'random'
     search_function: Literal['ensemble'] = 'ensemble' # which function to use for choosing what molecules to add to trainval from the pool
     test_fraction: float = 0.1 # This is the fraction of data used for test if a separate test set is not provided.
 
@@ -34,6 +33,7 @@ class ActiveArgs(Tap):
 def active_learning(active_args: ActiveArgs):
 
     train_args = get_initial_train_args(train_config_path=active_args.train_config_path, data_path=active_args.data_path)
+    active_args.split_type = train_args.split_type
     active_args.task_names = train_args.task_names
     active_args.smiles_columns = train_args.smiles_columns
     active_args.features_generator = train_args.features_generator

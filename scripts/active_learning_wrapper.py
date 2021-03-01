@@ -9,6 +9,7 @@ from typing_extensions import Literal
 
 from tap import Tap
 from tqdm import tqdm
+import numpy as np
 
 from chemprop.args import TrainArgs, PredictArgs
 from chemprop.data import get_task_names, get_data, MoleculeDataset, split_data
@@ -26,7 +27,7 @@ class ActiveArgs(Tap):
     active_test_features_path: List[str] = None
     active_test_indices_path: str = None # path to pickle file containing a list of indices for the test set out of the whole data path
     initial_trainval_indices_path: str = None # path to pickle file containing a list of indices for data in data path
-    search_function: Literal['ensemble'] = 'ensemble' # which function to use for choosing what molecules to add to trainval from the pool
+    search_function: Literal['ensemble','random'] = 'ensemble' # which function to use for choosing what molecules to add to trainval from the pool
     test_fraction: float = 0.1 # This is the fraction of data used for test if a separate test set is not provided.
 
 
@@ -82,7 +83,6 @@ def get_initial_train_args(train_config_path:str,data_path:str):
         ignore_columns=initial_train_args.ignore_columns
     )
     assert initial_train_args.num_tasks==1
-    assert (initial_train_args.ensemble_size != 1) or (initial_train_args.num_folds != 1)
 
     return initial_train_args
 
@@ -268,6 +268,7 @@ def run_predictions(active_args:ActiveArgs, train_args:TrainArgs) -> None:
     if isinstance(train_args.gpu,int):
         argument_input.extend(['--gpu', train_args.gpu])
     if active_args.search_function == 'ensemble':
+        assert (train_args.ensemble_size != 1) or (train_args.num_folds != 1)
         argument_input.append('--ensemble_variance')
     else:
         raise ValueError('This search function is not supported.')
@@ -281,7 +282,8 @@ def get_pred_results(active_args:ActiveArgs, whole_data:MoleculeDataset, iterati
         for i,line in enumerate(tqdm(reader)):
             for j in active_args.task_names:
                 whole_data[i].output[j+f'_{active_args.train_sizes[iteration]}'] = float(line[j])
-                whole_data[i].output[j+f'_unc_{active_args.train_sizes[iteration]}'] = float(line[j+'_epi_unc'])
+                if active_args.search_function == 'ensemble':
+                    whole_data[i].output[j+f'_unc_{active_args.train_sizes[iteration]}'] = float(line[j+'_epi_unc'])
 
 
 def save_results(active_args:ActiveArgs, test_data:MoleculeDataset, nontest_data:MoleculeDataset, whole_data:MoleculeDataset, iteration:int, save_whole_results:bool=False) -> None:
@@ -291,9 +293,10 @@ def save_results(active_args:ActiveArgs, test_data:MoleculeDataset, nontest_data
     for i in range(iteration+1):
         for j in active_args.task_names:
             fieldnames.append(j+f'_{active_args.train_sizes[i]}')
-    for i in range(iteration+1):
-        for j in active_args.task_names:
-            fieldnames.append(j+f'_unc_{active_args.train_sizes[i]}')
+    if active_args.search_function == 'ensemble':
+        for i in range(iteration+1):
+            for j in active_args.task_names:
+                fieldnames.append(j+f'_unc_{active_args.train_sizes[i]}')
     with open(os.path.join(active_args.active_save_dir,'test_results.csv'),'w') as f:
         writer=csv.DictWriter(f,fieldnames=fieldnames,extrasaction='ignore')
         writer.writeheader()
@@ -329,9 +332,12 @@ def update_trainval_split(
 
     if active_args.search_function == 'ensemble': # only for a single task
         priority_values = [d.output[active_args.task_names[0]+f'_unc_{active_args.train_sizes[iteration-1]}'] for d in previous_remaining_data]
-        sorted_remaining_data = [d for _,d in sorted(zip(priority_values,previous_remaining_data),reverse=True)]
-        new_data = sorted_remaining_data[:num_additional]
-        new_data_indices = {d.index for d in new_data}
+    elif active_args.search_function == 'random':
+        priority_values = [np.random.rand() for d in previous_remaining_data]
+    sorted_remaining_data = [d for _,d in sorted(zip(priority_values,previous_remaining_data),reverse=True)]
+    new_data = sorted_remaining_data[:num_additional]
+    new_data_indices = {d.index for d in new_data}
+
 
     updated_trainval_data = MoleculeDataset([d for d in previous_trainval_data]+new_data)
     updated_remaining_data = MoleculeDataset([d for d in previous_remaining_data if d.index not in new_data_indices])

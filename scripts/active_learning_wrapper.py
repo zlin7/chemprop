@@ -270,6 +270,8 @@ def run_predictions(active_args:ActiveArgs, train_args:TrainArgs) -> None:
     if active_args.search_function == 'ensemble':
         assert (train_args.ensemble_size != 1) or (train_args.num_folds != 1)
         argument_input.append('--ensemble_variance')
+    elif active_args.search_function == 'random':
+        pass
     else:
         raise ValueError('This search function is not supported.')
     pred_args = PredictArgs().parse_args(argument_input)
@@ -334,7 +336,7 @@ def update_trainval_split(
         priority_values = [d.output[active_args.task_names[0]+f'_unc_{active_args.train_sizes[iteration-1]}'] for d in previous_remaining_data]
     elif active_args.search_function == 'random':
         priority_values = [np.random.rand() for d in previous_remaining_data]
-    sorted_remaining_data = [d for _,d in sorted(zip(priority_values,previous_remaining_data),reverse=True)]
+    sorted_remaining_data = [d for _,d in sorted(zip(priority_values,previous_remaining_data),reverse=True,key=lambda x: (x[0],np.random.rand()))]
     new_data = sorted_remaining_data[:num_additional]
     new_data_indices = {d.index for d in new_data}
 

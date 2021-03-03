@@ -4,6 +4,7 @@ import shutil
 import csv
 import json
 import pickle
+import math
 from typing import List, Tuple, Set
 from typing_extensions import Literal
 
@@ -20,7 +21,6 @@ from chemprop.utils import makedirs
 class ActiveArgs(Tap):
     active_save_dir: str
     train_config_path: str # path to a json containing all the arguments usually included in a training submission, except for path arguments
-    train_sizes: List[int] = None # a list of number of datapoints to be included in trainval at each iteration. First value is overridden if initial_trainval_indices are provided
     data_path: str
     features_path: List[str] = None
     active_test_path: str = None # only use if separate from what's in the data file. If a subset, instead use the indices pickle.
@@ -29,6 +29,9 @@ class ActiveArgs(Tap):
     initial_trainval_indices_path: str = None # path to pickle file containing a list of indices for data in data path
     search_function: Literal['ensemble','random'] = 'ensemble' # which function to use for choosing what molecules to add to trainval from the pool
     test_fraction: float = 0.1 # This is the fraction of data used for test if a separate test set is not provided.
+    initial_trainval_fraction: float = None
+    active_batch_size: int = None # the number of data points added to trainval in each cycle
+    active_iterations_limit: int = None # the max number of training iterations to go through
 
 
 def active_learning(active_args: ActiveArgs):
@@ -183,11 +186,17 @@ def save_smiles(data: MoleculeDataset, save_dir: str, filename_base: str, active
 def initial_trainval_split(active_args: ActiveArgs, nontest_data: MoleculeDataset, whole_data: MoleculeDataset, save_data: bool = False, save_indices: bool = False) -> Tuple[MoleculeDataset]:
 
     num_data=len(whole_data)
-    if active_args.train_sizes is None:
-        active_args.train_sizes = [int(i/10*num_data) for i in range(1,10)]
+    num_nontest=len(nontest_data)
+
+    if active_args.active_batch_size is None:
+        active_args.active_batch_size = math.floor(num_nontest/10)
+    if active_args.initial_trainval_fraction is None and active_args.initial_trainval_indices_path is None:
+        active_args.initial_trainval_fraction = active_args.active_batch_size/num_data
+
     if active_args.initial_trainval_indices_path is not None:
         with open(active_args.initial_trainval_indices_path, 'rb') as f:
             trainval_indices = pickle.load(f)
+        active_args.initial_trainval_fraction = len(trainval_indices)/num_data
         trainval_data = MoleculeDataset([whole_data[i] for i in trainval_indices])
         remaining_data = MoleculeDataset([d for d in nontest_data if d.index not in trainval_indices])
         remaining_indices = {d.index for d in remaining_data}
@@ -196,7 +205,7 @@ def initial_trainval_split(active_args: ActiveArgs, nontest_data: MoleculeDatase
             save_dataset_indices(indices=remaining_indices, save_dir=active_args.active_save_dir, filename_base='initial_remaining')
 
     else:
-        fraction_trainval = active_args.train_sizes[0]/num_data
+        fraction_trainval = active_args.initial_trainval_fraction*num_data/num_nontest
         sizes = (fraction_trainval, 1 - fraction_trainval, 0)
         trainval_data, remaining_data, _ = split_data(data=nontest_data, split_type=active_args.split_type, sizes=sizes)
         if save_indices:
@@ -204,6 +213,13 @@ def initial_trainval_split(active_args: ActiveArgs, nontest_data: MoleculeDatase
             remaining_indices = {d.index for d in remaining_data}
             save_dataset_indices(indices=trainval_indices, save_dir=active_args.active_save_dir, filename_base='initial_trainval')
             save_dataset_indices(indices=remaining_indices, save_dir=active_args.active_save_dir, filename_base='initial_remaining')
+
+    active_args.train_sizes = list(range(len(trainval_data),num_nontest+1,active_args.active_batch_size))
+    if active_args.train_sizes[-1] != num_nontest:
+        active_args.train_sizes.append(num_nontest)
+    if active_args.active_iterations_limit is not None:
+        assert active_args.active_iterations_limit > 1
+        active_args.train_sizes = active_args.train_sizes[:active_args.active_iterations_limit]
 
     if save_data:
         save_dataset(data=trainval_data, save_dir=active_args.active_save_dir, filename_base='initial_trainval', active_args=active_args)

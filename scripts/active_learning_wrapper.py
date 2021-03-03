@@ -219,7 +219,8 @@ def initial_trainval_split(active_args: ActiveArgs, nontest_data: MoleculeDatase
         active_args.train_sizes.append(num_nontest)
     if active_args.active_iterations_limit is not None:
         assert active_args.active_iterations_limit > 1
-        active_args.train_sizes = active_args.train_sizes[:active_args.active_iterations_limit]
+        if active_args.active_iterations_limit<len(active_args.train_sizes):
+            active_args.train_sizes = active_args.train_sizes[:active_args.active_iterations_limit]
 
     if save_data:
         save_dataset(data=trainval_data, save_dir=active_args.active_save_dir, filename_base='initial_trainval', active_args=active_args)

@@ -1,7 +1,7 @@
 import threading
 from collections import OrderedDict
 from random import Random
-from typing import Dict, Iterator, List, Optional, Union
+from typing import Dict, Iterator, List, Optional, Union, Tuple
 
 import numpy as np
 from torch.utils.data import DataLoader, Dataset, Sampler
@@ -30,7 +30,7 @@ def set_cache_graph(cache_graph: bool) -> None:
 
 # Cache of RDKit molecules
 CACHE_MOL = True
-SMILES_TO_MOL: Dict[str, Chem.Mol] = {}
+SMILES_TO_MOL: Dict[str, Union[Chem.Mol,Tuple[Chem.Mol,Chem.Mol]]] = {}
 
 
 def cache_mol() -> bool:
@@ -43,6 +43,19 @@ def set_cache_mol(cache_mol: bool) -> None:
     global CACHE_MOL
     CACHE_MOL = cache_mol
 
+#Reaction and explicit H
+EXPLICIT_H = False
+REACTION = False
+
+def set_explicit_h(explicit_h: bool) -> None:
+    r"""Sets whether RDKit molecules will be constructed with explicit Hs"""
+    global EXPLICIT_H
+    EXPLICIT_H = explicit_h
+
+def set_reaction(reaction: bool) -> None:
+    r"""Sets whether to use a reaction or molecule as input"""
+    global REACTION
+    REACTION = reaction
 
 class MoleculeDatapoint:
     """A :class:`MoleculeDatapoint` contains a single molecule and its associated features and targets."""
@@ -91,12 +104,19 @@ class MoleculeDatapoint:
             for fg in self.features_generator:
                 features_generator = get_features_generator(fg)
                 for m in self.mol:
-                    if m is not None and m.GetNumHeavyAtoms() > 0:
-                        self.features.extend(features_generator(m))
-                    # for H2
-                    elif m is not None and m.GetNumHeavyAtoms() == 0:
-                        # not all features are equally long, so use methane as dummy molecule to determine length
-                        self.features.extend(np.zeros(len(features_generator(Chem.MolFromSmiles('C')))))
+                    if not REACTION:
+                        if m is not None and m.GetNumHeavyAtoms() > 0:
+                            self.features.extend(features_generator(m))
+                        # for H2
+                        elif m is not None and m.GetNumHeavyAtoms() == 0:
+                            # not all features are equally long, so use methane as dummy molecule to determine length
+                            self.features.extend(np.zeros(len(features_generator(Chem.MolFromSmiles('C')))))                           
+                    else:
+                        if m[0] is not None and m[1] is not None and m[0].GetNumHeavyAtoms() > 0:
+                            self.features.extend(features_generator(m[0]))
+                        elif m[0] is not None and m[1] is not None and m[0].GetNumHeavyAtoms() == 0:
+                            self.features.extend(np.zeros(len(features_generator(Chem.MolFromSmiles('C')))))   
+                    
 
             self.features = np.array(self.features)
 
@@ -123,9 +143,23 @@ class MoleculeDatapoint:
             self.atom_descriptors, self.atom_features, self.bond_features
 
     @property
-    def mol(self) -> List[Chem.Mol]:
+    def mol(self) -> List[Union[Chem.Mol,Tuple[Chem.Mol,Chem.Mol]]]:
         """Gets the corresponding list of RDKit molecules for the corresponding SMILES list."""
-        mol = [SMILES_TO_MOL.get(s, Chem.MolFromSmiles(s)) for s in self.smiles]
+        if REACTION:
+            if EXPLICIT_H:
+                mol = [SMILES_TO_MOL.get(s, (Chem.MolFromSmiles(s.split(">")[0],sanitize=False),Chem.MolFromSmiles(s.split(">")[-1],sanitize=False))) for s in self.smiles]
+                for m in mol:
+                    Chem.SanitizeMol(m[0],sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL^Chem.SanitizeFlags.SANITIZE_ADJUSTHS)
+                    Chem.SanitizeMol(m[1],sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL^Chem.SanitizeFlags.SANITIZE_ADJUSTHS)
+            else:
+                mol=[SMILES_TO_MOL.get(s, (Chem.MolFromSmiles(s.split(">")[0]),Chem.MolFromSmiles(s.split(">")[-1]))) for s in self.smiles]
+        else:
+            if EXPLICIT_H:
+                mol = [SMILES_TO_MOL.get(s, Chem.MolFromSmiles(s,sanitize=False)) for s in self.smiles]
+                for m in mol:
+                    Chem.SanitizeMol(m,sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL^Chem.SanitizeFlags.SANITIZE_ADJUSTHS)
+            else:
+                mol = [SMILES_TO_MOL.get(s, Chem.MolFromSmiles(s)) for s in self.smiles]
 
         if cache_mol():
             for s, m in zip(self.smiles, mol):
@@ -229,7 +263,7 @@ class MoleculeDataset(Dataset):
 
         return [d.smiles for d in self._data]
 
-    def mols(self, flatten: bool = False) -> Union[List[Chem.Mol], List[List[Chem.Mol]]]:
+    def mols(self, flatten: bool = False) -> Union[List[Union[Chem.Mol,Tuple[Chem.Mol,Chem.Mol]]], List[List[Union[Chem.Mol,Tuple[Chem.Mol,Chem.Mol]]]]]:
         """
         Returns a list of the RDKit molecules associated with each :class:`MoleculeDatapoint`.
 

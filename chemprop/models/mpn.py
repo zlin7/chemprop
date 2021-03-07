@@ -1,4 +1,4 @@
-from typing import List, Union
+from typing import List, Union, Tuple
 from functools import reduce
 
 import numpy as np
@@ -185,7 +185,7 @@ class MPN(nn.Module):
                                           for _ in range(args.number_of_molecules)])
 
     def forward(self,
-                batch: Union[List[List[str]], List[List[Chem.Mol]], BatchMolGraph],
+                batch: Union[List[List[str]], List[List[Union[Chem.Mol,Tuple[Chem.Mol,Chem.Mol]]]], BatchMolGraph],
                 features_batch: List[np.ndarray] = None,
                 atom_descriptors_batch: List[np.ndarray] = None,
                 atom_features_batch: List[np.ndarray] = None,

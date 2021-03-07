@@ -12,7 +12,7 @@ import numpy as np
 from .data import MoleculeDataset
 
 
-def generate_scaffold(mol: Union[str, Chem.Mol], include_chirality: bool = False) -> str:
+def generate_scaffold(mol: Union[str, Union[Chem.Mol,Tuple[Chem.Mol,Chem.Mol]]], include_chirality: bool = False) -> str:
     """
     Computes the Bemis-Murcko scaffold for a SMILES string.
 
@@ -20,13 +20,18 @@ def generate_scaffold(mol: Union[str, Chem.Mol], include_chirality: bool = False
     :param include_chirality: Whether to include chirality in the computed scaffold..
     :return: The Bemis-Murcko scaffold for the molecule.
     """
-    mol = Chem.MolFromSmiles(mol) if type(mol) == str else mol
+    if type(mol) == tuple:
+        mol = mol[0]
+    elif type(mol) == str and ">" in mol:
+        mol = Chem.MolFromSmiles(mol.split(">")[0])
+    else:
+        mol = Chem.MolFromSmiles(mol) if type(mol) == str else mol
     scaffold = MurckoScaffold.MurckoScaffoldSmiles(mol=mol, includeChirality=include_chirality)
 
     return scaffold
 
 
-def scaffold_to_smiles(mols: Union[List[str], List[Chem.Mol]],
+def scaffold_to_smiles(mols: Union[List[str], List[Union[Chem.Mol,Tuple[Chem.Mol,Chem.Mol]]]],
                        use_indices: bool = False) -> Dict[str, Union[Set[str], Set[int]]]:
     """
     Computes the scaffold for each SMILES and returns a mapping from scaffolds to sets of smiles (or indices).

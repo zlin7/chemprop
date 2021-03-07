@@ -9,8 +9,8 @@ import torch
 from tap import Tap  # pip install typed-argument-parser (https://github.com/swansonk14/typed-argument-parser)
 
 import chemprop.data.utils
-from chemprop.data import set_cache_mol
-from chemprop.features import get_available_features_generators
+from chemprop.data import set_cache_mol, set_explicit_h, set_reaction
+from chemprop.features import get_available_features_generators, set_reaction_mode
 
 
 Metric = Literal['auc', 'prc-auc', 'rmse', 'mae', 'mse', 'r2', 'accuracy', 'cross_entropy', 'binary_cross_entropy']
@@ -321,6 +321,21 @@ class TrainArgs(CommonArgs):
     """Aggregation scheme for atomic vectors into molecular vectors"""
     aggregation_norm: int = 100
     """For norm aggregation, number by which to divide summed up atomic features"""
+    reaction: bool = False
+    """
+    Whether to adjust MPNN layer to take reactions as input instead of molecules.
+    """
+    reaction_mode: Literal['Reac_Prod','Reac_Diff','Prod_Diff'] = 'Reac_Prod'
+    """
+    Choices for construction of atom and bond features for reactions
+    :code:`Reac_Prod`: concatenates the reactants feature with the products feature.
+    :code:`Reac_Diff`: concatenates the reactants feature with the difference in features between reactants and products. 
+    :code:`Prod_Diff`: concatenates the products feature with the difference in features between reactants and products. 
+    """
+    explicit_h: bool = False
+    """
+    Whether H are explicitly specified in input (and should be kept this way).
+    """
 
     # Training arguments
     epochs: int = 30
@@ -551,6 +566,11 @@ class TrainArgs(CommonArgs):
 
         if not self.bond_feature_scaling and self.bond_features_path is None:
             raise ValueError('Bond descriptor scaling is only possible if additional bond features are provided.')
+
+        # set explicit H option and reaction option
+        set_explicit_h(self.explicit_h)
+        set_reaction(self.reaction)
+        set_reaction_mode(self.reaction_mode)
 
 
 class PredictArgs(CommonArgs):

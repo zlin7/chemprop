@@ -35,6 +35,7 @@ Please see [aicures.mit.edu](https://aicures.mit.edu) and the associated [data G
     * [RDKit 2D Features](#rdkit-2d-features)
     * [Custom Features](#custom-features)
     * [Atomic Features](#atomic-features)
+  * [Reaction](#reaction)
 - [Predicting](#predicting)
   * [Epistemic Uncertainty](#epistemic-uncertainty)
 - [Encode Fingerprint Latent Representation](encode-fingerprint-latent-representation)
@@ -241,6 +242,10 @@ Bond-level features can be provided in the same format as the atom-level feature
 The bond-level features are concatenated with the bond feature vectors before the D-MPNN, such that they are used during message-passing. Alternatively, the user can overwrite the default bond features with the custom features using the option `--overwrite_default_bond_features`. 
 
 Similar to molecule-, and atom-level features, the bond-level features are scaled by default. This can be disabled with the option `--no_bond_features_scaling`.
+
+### Reaction
+
+As an alternative to molecule SMILES, Chemprop can also process atom-mapped reaction SMILES, using the option `--reaction`, which transforms the inputted reaction to the corresponding condensed graph of reactions and changes the initial atom and bond features to hold information from both the reactant and product (option `--reaction_mode Reac_Prod`, default), or from the reactant and the difference upon reaction (option `--reaction_mode Reac_Diff`) or from the product and the difference upon reaction (option `--reaction_mode Prod_Diff`). Functions incompatible with a reaction as input (scaffold splitting and feature generation) are carried out on the reactants. If the atom-mapped reaction SMILES contain mapped hydrogens, enable explicit hydrogens via `--explicit_h`.
 
 ## Predicting
 

@@ -5,9 +5,10 @@ import torch
 from tqdm import tqdm
 
 from chemprop.args import PredictArgs, TrainArgs
-from chemprop.data import get_data, get_data_from_smiles, MoleculeDataLoader, MoleculeDataset
+from chemprop.data import get_data, get_data_from_smiles, MoleculeDataLoader, MoleculeDataset, set_explicit_h, set_reaction
 from chemprop.utils import load_args, load_checkpoint, makedirs, timeit, load_scalers, update_prediction_args
 from chemprop.data import MoleculeDataLoader, MoleculeDataset
+from chemprop.features import set_reaction_atom_fdim, set_reaction_bond_fdim, set_reaction_mode
 from chemprop.models import MoleculeModel
 
 @timeit()
@@ -27,6 +28,15 @@ def molecule_fingerprint(args: PredictArgs, smiles: List[List[str]] = None) -> L
     # Update args with training arguments
     update_prediction_args(predict_args=args, train_args=train_args, validate_feature_sources=False)
     args: Union[PredictArgs, TrainArgs]
+
+    #set explicit H option and reaction option
+    set_explicit_h(train_args.explicit_h)
+    set_reaction(train_args.reaction)
+    set_reaction_mode(train_args.reaction_mode)
+
+    if args.reaction:
+        set_reaction_atom_fdim()
+        set_reaction_bond_fdim()
 
     print('Loading data')
     if smiles is not None:

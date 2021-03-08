@@ -9,8 +9,8 @@ import torch
 from tap import Tap  # pip install typed-argument-parser (https://github.com/swansonk14/typed-argument-parser)
 
 import chemprop.data.utils
-from chemprop.data import set_cache_mol, set_explicit_h, set_reaction
-from chemprop.features import get_available_features_generators, set_reaction_mode
+from chemprop.data import set_cache_mol
+from chemprop.features import get_available_features_generators
 
 
 Metric = Literal['auc', 'prc-auc', 'rmse', 'mae', 'mse', 'r2', 'accuracy', 'cross_entropy', 'binary_cross_entropy']
@@ -566,11 +566,6 @@ class TrainArgs(CommonArgs):
 
         if not self.bond_feature_scaling and self.bond_features_path is None:
             raise ValueError('Bond descriptor scaling is only possible if additional bond features are provided.')
-
-        # set explicit H option and reaction option
-        set_explicit_h(self.explicit_h)
-        set_reaction(self.reaction)
-        set_reaction_mode(self.reaction_mode)
 
 
 class PredictArgs(CommonArgs):

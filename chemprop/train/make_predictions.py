@@ -7,9 +7,9 @@ from tqdm import tqdm
 
 from .predict import predict
 from chemprop.args import PredictArgs, TrainArgs
-from chemprop.data import get_data, get_data_from_smiles, MoleculeDataLoader, MoleculeDataset
+from chemprop.data import get_data, get_data_from_smiles, MoleculeDataLoader, MoleculeDataset, set_explicit_h, set_reaction
 from chemprop.utils import load_args, load_checkpoint, load_scalers, makedirs, timeit, update_prediction_args
-from chemprop.features import set_extra_atom_fdim, set_extra_bond_fdim
+from chemprop.features import set_extra_atom_fdim, set_extra_bond_fdim, set_reaction_atom_fdim, set_reaction_bond_fdim, set_reaction_mode
 
 @timeit()
 def make_predictions(args: PredictArgs, smiles: List[List[str]] = None) -> List[List[Optional[float]]]:
@@ -36,6 +36,15 @@ def make_predictions(args: PredictArgs, smiles: List[List[str]] = None) -> List[
 
     if args.bond_features_path is not None:
         set_extra_bond_fdim(train_args.bond_features_size)
+
+    #set explicit H option and reaction option
+    set_explicit_h(train_args.explicit_h)
+    set_reaction(train_args.reaction)
+    set_reaction_mode(train_args.reaction_mode)
+
+    if args.reaction:
+        set_reaction_atom_fdim()
+        set_reaction_bond_fdim()
 
     print('Loading data')
     if smiles is not None:

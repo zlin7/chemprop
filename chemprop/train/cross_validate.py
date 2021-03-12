@@ -60,8 +60,11 @@ def cross_validate(args: TrainArgs,
     set_explicit_h_feat(args.explicit_h)
     set_explicit_h(args.explicit_h)
     set_reaction(args.reaction)
-    set_reaction_mode(args.reaction_mode)
-
+    if args.reaction:
+        set_reaction_mode(args.reaction_mode)
+        set_reaction_atom_fdim()
+        set_reaction_bond_fdim()
+        
     # Get data
     debug('Loading data')
     data = get_data(
@@ -83,10 +86,6 @@ def cross_validate(args: TrainArgs,
     if args.bond_features_path is not None:
         args.bond_features_size = data.bond_features_size()
         set_extra_bond_fdim(args.bond_features_size)
-
-    if args.reaction:
-        set_reaction_atom_fdim()
-        set_reaction_bond_fdim()
 
     debug(f'Number of tasks = {args.num_tasks}')
 

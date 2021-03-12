@@ -41,10 +41,10 @@ def make_predictions(args: PredictArgs, smiles: List[List[str]] = None) -> List[
     #set explicit H option and reaction option
     set_explicit_h(train_args.explicit_h)
     set_explicit_h_feat(train_args.explicit_h)
-    set_reaction(train_args.reaction)
-    set_reaction_mode(train_args.reaction_mode)
+    set_reaction(train_args.reaction) 
 
     if args.reaction:
+        set_reaction_mode(train_args.reaction_mode)
         set_reaction_atom_fdim()
         set_reaction_bond_fdim()
 

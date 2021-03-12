@@ -325,7 +325,7 @@ class TrainArgs(CommonArgs):
     """
     Whether to adjust MPNN layer to take reactions as input instead of molecules.
     """
-    reaction_mode: Literal['Reac_Prod','Reac_Diff','Prod_Diff'] = 'Reac_Prod'
+    reaction_mode: Literal['Reac_Prod','Reac_Diff','Prod_Diff'] = 'Reac_Diff'
     """
     Choices for construction of atom and bond features for reactions
     :code:`Reac_Prod`: concatenates the reactants feature with the products feature.

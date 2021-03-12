@@ -33,6 +33,7 @@ EXTRA_ATOM_FDIM = 0
 BOND_FDIM = 14
 EXTRA_BOND_FDIM = 0
 REACTION_MODE = None
+EXPLICIT_H = False
 
 def get_atom_fdim(overwrite_default_atom: bool = False) -> int:
     """
@@ -49,7 +50,11 @@ def set_reaction_mode(mode) -> str:
     global REACTION_MODE
     REACTION_MODE = mode
 
-
+def set_explicit_h_feat(explicit_h: bool) -> None:
+    r"""Sets whether RDKit molecules will be constructed with explicit Hs"""
+    global EXPLICIT_H
+    EXPLICIT_H = explicit_h
+    
 def set_reaction_atom_fdim():
     """Change the dimensionality of the atom feature vector for reactions."""
     global EXTRA_ATOM_FDIM
@@ -215,14 +220,14 @@ class MolGraph:
         if type(mol) == str:
             if REACTION_MODE:
                 if EXPLICIT_H:
-                    mol=(Chem.MolFromSmiles(s.split(">")[0],sanitize=False),Chem.MolFromSmiles(s.split(">")[-1],sanitize=False))
+                    mol=(Chem.MolFromSmiles(mol.split(">")[0],sanitize=False),Chem.MolFromSmiles(mol.split(">")[-1],sanitize=False))
                     Chem.SanitizeMol(mol[0],sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL^Chem.SanitizeFlags.SANITIZE_ADJUSTHS)
                     Chem.SanitizeMol(mol[1],sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL^Chem.SanitizeFlags.SANITIZE_ADJUSTHS)
                 else:
-                    mol=(Chem.MolFromSmiles(s.split(">")[0]),Chem.MolFromSmiles(s.split(">")[-1]))
+                    mol=(Chem.MolFromSmiles(mol.split(">")[0]),Chem.MolFromSmiles(mol.split(">")[-1]))
             else:
                 if EXPLICIT_H:
-                    mol = Chem.MolFromSmiles(s,sanitize=False)
+                    mol = Chem.MolFromSmiles(mol,sanitize=False)
                     Chem.SanitizeMol(mol,sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL^Chem.SanitizeFlags.SANITIZE_ADJUSTHS)
                 else:
                     mol = Chem.MolFromSmiles(mol)

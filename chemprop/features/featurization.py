@@ -242,7 +242,7 @@ class MolGraph:
             if self.is_reaction:
                 mol = (make_mol(mol.split(">")[0],self.is_explicit_h),make_mol(mol.split(">")[-1],self.is_explicit_h)) 
             else:
-                mol = make_mol(mol,keep_h)
+                mol = make_mol(mol,self.is_explicit_h)
 
         self.n_atoms = 0  # number of atoms
         self.n_bonds = 0  # number of bonds

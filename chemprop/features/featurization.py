@@ -3,6 +3,7 @@ from itertools import zip_longest
 from rdkit import Chem
 import torch
 import numpy as np
+from chemprop.rdkit import make_mol
 
 # Atom feature sizes
 MAX_ATOMIC_NUM = 100
@@ -34,6 +35,7 @@ BOND_FDIM = 14
 EXTRA_BOND_FDIM = 0
 REACTION_MODE = None
 EXPLICIT_H = False
+REACTION = False
 
 def get_atom_fdim(overwrite_default_atom: bool = False) -> int:
     """
@@ -44,28 +46,50 @@ def get_atom_fdim(overwrite_default_atom: bool = False) -> int:
     """
     return (not overwrite_default_atom) * ATOM_FDIM + EXTRA_ATOM_FDIM
 
+def set_explicit_h(explicit_h: bool) -> None:
+    """
+    Sets whether RDKit molecules will be constructed with explicit Hs.
 
-def set_reaction_mode(mode) -> str:
-    """Sets the mode of reaction atom and bond features."""
-    global REACTION_MODE
-    REACTION_MODE = mode
-
-def set_explicit_h_feat(explicit_h: bool) -> None:
-    r"""Sets whether RDKit molecules will be constructed with explicit Hs"""
+    :param explicit_h: Boolean whether to keep explicit Hs from input.
+    """
     global EXPLICIT_H
     EXPLICIT_H = explicit_h
     
-def set_reaction_atom_fdim():
-    """Change the dimensionality of the atom feature vector for reactions."""
-    global EXTRA_ATOM_FDIM
-    EXTRA_ATOM_FDIM = ATOM_FDIM - MAX_ATOMIC_NUM -1
+def set_reaction(reaction: bool, mode: str) -> None:
+    """
+    Sets whether to use a reaction or molecule as input and adapts feature dimensions.
+ 
+    :param reaction: Boolean whether to except reactions as input.
+    :param mode: Reaction mode to construct atom and bond feature vectors.
 
+    """
+    global REACTION
+    REACTION = reaction
+    if reaction:
+        global REACTION_MODE
+        global EXTRA_BOND_FDIM
+        global EXTRA_ATOM_FDIM
+    
+        EXTRA_ATOM_FDIM = ATOM_FDIM - MAX_ATOMIC_NUM -1
+        EXTRA_BOND_FDIM = BOND_FDIM
+        REACTION_MODE = mode        
+    
+def is_explicit_h() -> bool:
+    r"""Returns whether to use retain explicit Hs"""
+    return EXPLICIT_H
+
+def is_reaction() -> bool:
+    r"""Returns whether to use reactions as input"""
+    return REACTION
+
+def reaction_mode() -> str:
+    r"""Returns the reaction mode"""
+    return REACTION_MODE
 
 def set_extra_atom_fdim(extra):
     """Change the dimensionality of the atom feature vector."""
     global EXTRA_ATOM_FDIM
     EXTRA_ATOM_FDIM = extra
-
 
 def get_bond_fdim(atom_messages: bool = False,
                   overwrite_default_bond: bool = False,
@@ -83,13 +107,6 @@ def get_bond_fdim(atom_messages: bool = False,
 
     return (not overwrite_default_bond) * BOND_FDIM + EXTRA_BOND_FDIM + \
            (not atom_messages) * get_atom_fdim(overwrite_default_atom=overwrite_default_atom)
-
-
-def set_reaction_bond_fdim():
-    """Change the dimensionality of the bond feature vector for reactions."""
-    global EXTRA_BOND_FDIM
-    EXTRA_BOND_FDIM = BOND_FDIM
-
     
 def set_extra_bond_fdim(extra):
     """Change the dimensionality of the bond feature vector."""
@@ -204,7 +221,7 @@ class MolGraph:
     * :code:`overwrite_default_bond_features`: A boolean to overwrite default bond descriptors.
     """
 
-    def __init__(self, mol: Union[str, Union[Chem.Mol,Tuple[Chem.Mol,Chem.Mol]]],
+    def __init__(self, mol: Union[str, Chem.Mol, Tuple[Chem.Mol,Chem.Mol]],
                  atom_features_extra: np.ndarray = None,
                  bond_features_extra: np.ndarray = None,
                  overwrite_default_atom_features: bool = False,
@@ -216,21 +233,16 @@ class MolGraph:
         :param overwrite_default_atom_features: Boolean to overwrite default atom features by atom_features instead of concatenating
         :param overwrite_default_bond_features: Boolean to overwrite default bond features by bond_features instead of concatenating
         """
+        self.is_reaction = is_reaction()
+        self.is_explicit_h = is_explicit_h()
+        self.reaction_mode = reaction_mode()
+        
         # Convert SMILES to RDKit molecule if necessary
         if type(mol) == str:
-            if REACTION_MODE:
-                if EXPLICIT_H:
-                    mol=(Chem.MolFromSmiles(mol.split(">")[0],sanitize=False),Chem.MolFromSmiles(mol.split(">")[-1],sanitize=False))
-                    Chem.SanitizeMol(mol[0],sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL^Chem.SanitizeFlags.SANITIZE_ADJUSTHS)
-                    Chem.SanitizeMol(mol[1],sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL^Chem.SanitizeFlags.SANITIZE_ADJUSTHS)
-                else:
-                    mol=(Chem.MolFromSmiles(mol.split(">")[0]),Chem.MolFromSmiles(mol.split(">")[-1]))
+            if self.is_reaction:
+                mol = (make_mol(mol.split(">")[0],self.is_explicit_h),make_mol(mol.split(">")[-1],self.is_explicit_h)) 
             else:
-                if EXPLICIT_H:
-                    mol = Chem.MolFromSmiles(mol,sanitize=False)
-                    Chem.SanitizeMol(mol,sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL^Chem.SanitizeFlags.SANITIZE_ADJUSTHS)
-                else:
-                    mol = Chem.MolFromSmiles(mol)
+                mol = make_mol(mol,keep_h)
 
         self.n_atoms = 0  # number of atoms
         self.n_bonds = 0  # number of bonds
@@ -242,7 +254,7 @@ class MolGraph:
         self.overwrite_default_atom_features = overwrite_default_atom_features
         self.overwrite_default_bond_features = overwrite_default_bond_features
 
-        if not REACTION_MODE:
+        if not self.is_reaction:
             # Get atom features
             self.f_atoms = [atom_features(atom) for atom in mol.GetAtoms()]
             if atom_features_extra is not None:
@@ -309,13 +321,13 @@ class MolGraph:
             f_atoms_prod = [atom_features(mol_prod.GetAtomWithIdx(ri2pi[atom.GetIdx()]))  if atom.GetIdx() not in rio else
                             atom_features(None) for atom in mol_reac.GetAtoms()] + [atom_features(mol_prod.GetAtomWithIdx(index)) for index in pio]
             
-            if REACTION_MODE in ['Reac_Diff','Prod_Diff']:
+            if self.reaction_mode in ['Reac_Diff','Prod_Diff']:
                 f_atoms_diff = [list(map(lambda x, y: x - y, ii, jj)) for ii, jj in zip(f_atoms_prod,f_atoms_reac)]
-            if REACTION_MODE == 'Reac_Prod':
+            if self.reaction_mode == 'Reac_Prod':
                 self.f_atoms = [x+y[MAX_ATOMIC_NUM+1:] for x,y in zip(f_atoms_reac,f_atoms_prod)]
-            elif REACTION_MODE == 'Reac_Diff':
+            elif self.reaction_mode == 'Reac_Diff':
                 self.f_atoms = [x+y[MAX_ATOMIC_NUM+1:] for x,y in zip(f_atoms_reac,f_atoms_diff)]
-            elif REACTION_MODE == 'Prod_Diff':
+            elif self.reaction_mode == 'Prod_Diff':
                 self.f_atoms = [x+y[MAX_ATOMIC_NUM+1:] for x,y in zip(f_atoms_prod,f_atoms_diff)]
             self.n_atoms = len(self.f_atoms)
             n_atoms_reac=mol_reac.GetNumAtoms()
@@ -348,13 +360,13 @@ class MolGraph:
 
                     f_bond_reac=bond_features(bond_reac)
                     f_bond_prod=bond_features(bond_prod)
-                    if REACTION_MODE in ['Reac_Diff','Prod_Diff']:
+                    if self.reaction_mode in ['Reac_Diff','Prod_Diff']:
                         f_bond_diff = [y-x for x,y in zip(f_bond_reac,f_bond_prod)]
-                    if REACTION_MODE == 'Reac_Prod':
+                    if self.reaction_mode == 'Reac_Prod':
                         f_bond = f_bond_reac+f_bond_prod
-                    elif REACTION_MODE == 'Reac_Diff':
+                    elif self.reaction_mode == 'Reac_Diff':
                         f_bond = f_bond_reac+f_bond_diff
-                    elif REACTION_MODE == 'Prod_Diff':
+                    elif self.reaction_mode == 'Prod_Diff':
                         f_bond = f_bond_prod+f_bond_diff
                     self.f_bonds.append(self.f_atoms[a1] + f_bond)
                     self.f_bonds.append(self.f_atoms[a2] + f_bond)
@@ -494,7 +506,7 @@ class BatchMolGraph:
         return self.a2a
 
 
-def mol2graph(mols: Union[List[str], List[Union[Chem.Mol,Tuple[Chem.Mol,Chem.Mol]]]],
+def mol2graph(mols: Union[List[str], List[Chem.Mol], List[Tuple[Chem.Mol,Chem.Mol]]],
               atom_features_batch: List[np.array] = None,
               bond_features_batch: List[np.array] = None,
               overwrite_default_atom_features: bool = False,

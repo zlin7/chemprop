@@ -10,7 +10,8 @@ from rdkit import Chem
 from .scaler import StandardScaler
 from chemprop.features import get_features_generator
 from chemprop.features import BatchMolGraph, MolGraph
-
+from chemprop.features import is_explicit_h, is_reaction
+from chemprop.rdkit import make_mol
 
 # Cache of graph featurizations
 CACHE_GRAPH = True
@@ -42,20 +43,7 @@ def set_cache_mol(cache_mol: bool) -> None:
     r"""Sets whether RDKit molecules will be cached."""
     global CACHE_MOL
     CACHE_MOL = cache_mol
-
-#Reaction and explicit H
-EXPLICIT_H = False
-REACTION = False
-
-def set_explicit_h(explicit_h: bool) -> None:
-    r"""Sets whether RDKit molecules will be constructed with explicit Hs"""
-    global EXPLICIT_H
-    EXPLICIT_H = explicit_h
-
-def set_reaction(reaction: bool) -> None:
-    r"""Sets whether to use a reaction or molecule as input"""
-    global REACTION
-    REACTION = reaction
+    
 
 class MoleculeDatapoint:
     """A :class:`MoleculeDatapoint` contains a single molecule and its associated features and targets."""
@@ -96,6 +84,9 @@ class MoleculeDatapoint:
         self.bond_features = bond_features
         self.overwrite_default_atom_features = overwrite_default_atom_features
         self.overwrite_default_bond_features = overwrite_default_bond_features
+        self.is_reaction = is_reaction()
+        self.is_explicit_h = is_explicit_h()
+        
 
         # Generate additional features if given a generator
         if self.features_generator is not None:
@@ -104,7 +95,7 @@ class MoleculeDatapoint:
             for fg in self.features_generator:
                 features_generator = get_features_generator(fg)
                 for m in self.mol:
-                    if not REACTION:
+                    if not self.is_reaction:
                         if m is not None and m.GetNumHeavyAtoms() > 0:
                             self.features.extend(features_generator(m))
                         # for H2
@@ -143,24 +134,10 @@ class MoleculeDatapoint:
             self.atom_descriptors, self.atom_features, self.bond_features
 
     @property
-    def mol(self) -> List[Union[Chem.Mol,Tuple[Chem.Mol,Chem.Mol]]]:
+    def mol(self) -> Union[List[Chem.Mol],List[Tuple[Chem.Mol,Chem.Mol]]]:
         """Gets the corresponding list of RDKit molecules for the corresponding SMILES list."""
-        if REACTION:
-            if EXPLICIT_H:
-                mol = [SMILES_TO_MOL.get(s, (Chem.MolFromSmiles(s.split(">")[0],sanitize=False),Chem.MolFromSmiles(s.split(">")[-1],sanitize=False))) for s in self.smiles]
-                for m in mol:
-                    Chem.SanitizeMol(m[0],sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL^Chem.SanitizeFlags.SANITIZE_ADJUSTHS)
-                    Chem.SanitizeMol(m[1],sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL^Chem.SanitizeFlags.SANITIZE_ADJUSTHS)
-            else:
-                mol=[SMILES_TO_MOL.get(s, (Chem.MolFromSmiles(s.split(">")[0]),Chem.MolFromSmiles(s.split(">")[-1]))) for s in self.smiles]
-        else:
-            if EXPLICIT_H:
-                mol = [SMILES_TO_MOL.get(s, Chem.MolFromSmiles(s,sanitize=False)) for s in self.smiles]
-                for m in mol:
-                    Chem.SanitizeMol(m,sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL^Chem.SanitizeFlags.SANITIZE_ADJUSTHS)
-            else:
-                mol = [SMILES_TO_MOL.get(s, Chem.MolFromSmiles(s)) for s in self.smiles]
-
+        mol = make_mols(self.smiles,self.is_reaction,self.is_explicit_h)
+    
         if cache_mol():
             for s, m in zip(self.smiles, mol):
                 SMILES_TO_MOL[s] = m
@@ -263,7 +240,7 @@ class MoleculeDataset(Dataset):
 
         return [d.smiles for d in self._data]
 
-    def mols(self, flatten: bool = False) -> Union[List[Union[Chem.Mol,Tuple[Chem.Mol,Chem.Mol]]], List[List[Union[Chem.Mol,Tuple[Chem.Mol,Chem.Mol]]]]]:
+    def mols(self, flatten: bool = False) -> Union[List[Chem.Mol],List[List[Chem.Mol]],List[Tuple[Chem.Mol,Chem.Mol]],List[List[Tuple[Chem.Mol,Chem.Mol]]]]:
         """
         Returns a list of the RDKit molecules associated with each :class:`MoleculeDatapoint`.
 
@@ -674,3 +651,19 @@ class MoleculeDataLoader(DataLoader):
     def __iter__(self) -> Iterator[MoleculeDataset]:
         r"""Creates an iterator which returns :class:`MoleculeDataset`\ s"""
         return super(MoleculeDataLoader, self).__iter__()
+
+    
+def make_mols(smiles: List[str],reaction: bool, keep_h: bool):
+    """
+    Builds a list of RDKit molecules (or a list of tuples of molecules if reaction is True) for a list of smiles.
+
+    :param smiles: List of SMILES strings.
+    :param reaction: Boolean whether the SMILES strings are to be treated as a reaction.
+    :param keep_h: Boolean whether to keep hydrogens in the input smiles. This does not add hydrogens, it only keeps them if they are specified.
+    :return: List of RDKit molecules or list of tuple of molecules.
+    """
+    if reaction:
+        mol = [SMILES_TO_MOL[s] if s in SMILES_TO_MOL else (make_mol(s.split(">")[0],keep_h),make_mol(s.split(">")[-1],keep_h)) for s in smiles]
+    else:
+        mol = [SMILES_TO_MOL[s] if s in SMILES_TO_MOL else make_mol(s,keep_h) for s in smiles]
+    return mol

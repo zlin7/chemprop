@@ -6,8 +6,6 @@ from .data import (
     MoleculeDataLoader,
     MoleculeSampler,
     set_cache_graph,
-    set_explicit_h,
-    set_reaction,
     set_cache_mol
 )
 from .scaffold import generate_scaffold, log_scaffold_stats, scaffold_split, scaffold_to_smiles
@@ -35,8 +33,6 @@ __all__ = [
     'MoleculeSampler',
     'set_cache_graph',
     'set_cache_mol',
-    'set_explicit_h',
-    'set_reaction',
     'generate_scaffold',
     'log_scaffold_stats',
     'scaffold_split',

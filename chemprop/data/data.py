@@ -29,6 +29,12 @@ def set_cache_graph(cache_graph: bool) -> None:
     CACHE_GRAPH = cache_graph
 
 
+def empty_cache():
+    r"""Empties the cache of :class:`~chemprop.features.MolGraph`\ s  and RDKit molecules."""
+    SMILES_TO_GRAPH.clear()
+    SMILES_TO_MOL.clear()
+
+
 # Cache of RDKit molecules
 CACHE_MOL = True
 SMILES_TO_MOL: Dict[str, Union[Chem.Mol,Tuple[Chem.Mol,Chem.Mol]]] = {}

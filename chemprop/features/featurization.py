@@ -198,7 +198,10 @@ def map_reac_to_prod(mol_reac: Chem.Mol, mol_prod: Chem.Mol):
     for atom in mol_reac.GetAtoms():
         mapno=atom.GetAtomMapNum()
         if mapno >0:
-            reac_id_to_prod_id[atom.GetIdx()]=prod_map_to_id[mapno]
+            try:
+                reac_id_to_prod_id[atom.GetIdx()]=prod_map_to_id[mapno]
+            except KeyError:
+                only_reac_ids.append(atom.GetIdx())
         else:
             only_reac_ids.append(atom.GetIdx())
     return reac_id_to_prod_id, only_prod_ids, only_reac_ids

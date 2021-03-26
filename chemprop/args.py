@@ -9,7 +9,7 @@ import torch
 from tap import Tap  # pip install typed-argument-parser (https://github.com/swansonk14/typed-argument-parser)
 
 import chemprop.data.utils
-from chemprop.data import set_cache_mol
+from chemprop.data import set_cache_mol, empty_cache
 from chemprop.features import get_available_features_generators
 
 
@@ -103,6 +103,10 @@ class CommonArgs(Tap):
     no_cache_mol: bool = False
     """
     Whether to not cache the RDKit molecule for each SMILES string to reduce memory usage (cached by default).
+    """
+    empty_cache: bool = False
+    """
+    Whether to empty all caches before training or predicting. This is necessary if multiple jobs are run within a single script and the atom or bond features change.
     """
 
     def __init__(self, *args, **kwargs):
@@ -199,6 +203,9 @@ class CommonArgs(Tap):
                                       'per input (i.e., number_of_molecules = 1).')
 
         set_cache_mol(not self.no_cache_mol)
+
+        if self.empty_cache:
+            empty_cache()
 
 
 class TrainArgs(CommonArgs):

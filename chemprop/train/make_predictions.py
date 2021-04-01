@@ -65,10 +65,7 @@ def make_predictions(args: PredictArgs, smiles: List[List[str]] = None) -> List[
     print(f'Test size = {len(test_data):,}')
 
     # Predict with each model individually and sum predictions
-    if args.dataset_type == 'multiclass':
-        sum_preds = np.zeros((len(test_data), num_tasks, args.multiclass_num_classes))
-    else:
-        sum_preds = np.zeros((len(test_data), num_tasks))
+    sum_preds = None
 
     # Create data loader
     test_data_loader = MoleculeDataLoader(
@@ -79,7 +76,7 @@ def make_predictions(args: PredictArgs, smiles: List[List[str]] = None) -> List[
 
     # Partial results for variance robust calculation.
     if args.ensemble_variance:
-        all_preds = np.zeros((len(test_data), num_tasks, len(args.checkpoint_paths)))
+        all_preds = []
 
     print(f'Predicting with an ensemble of {len(args.checkpoint_paths)} models')
     for index, checkpoint_path in enumerate(tqdm(args.checkpoint_paths, total=len(args.checkpoint_paths))):
@@ -101,17 +98,22 @@ def make_predictions(args: PredictArgs, smiles: List[List[str]] = None) -> List[
         model_preds = predict(
             model=model,
             data_loader=test_data_loader,
-            scaler=scaler
+            scaler=scaler,
+            embed_only=args.embed_only,
         )
-        sum_preds += np.array(model_preds)
+        model_preds = np.array(model_preds)
+        if sum_preds is None:
+            sum_preds = model_preds
+        else:
+            sum_preds += model_preds
         if args.ensemble_variance:
-            all_preds[:, :, index] = model_preds
-
+            all_preds.append(model_preds)
     # Ensemble predictions
     avg_preds = sum_preds / len(args.checkpoint_paths)
     avg_preds = avg_preds.tolist()
 
     if args.ensemble_variance:
+        all_preds = np.stack(all_preds, axis=2)
         all_epi_uncs = np.var(all_preds, axis=2)
         all_epi_uncs = all_epi_uncs.tolist()
 
@@ -149,12 +151,15 @@ def make_predictions(args: PredictArgs, smiles: List[List[str]] = None) -> List[
             for pred_name, pred, epi_unc in zip(task_names, preds, epi_uncs):
                 datapoint.row[pred_name] = pred
                 datapoint.row[pred_name+'_epi_unc'] = epi_unc
+        elif args.embed_only:
+            datapoint.row = {'smiles': datapoint.row['smiles']}
+            datapoint.row.update({i: v for i,v in enumerate(preds)})
         else:
             for pred_name, pred in zip(task_names, preds):
                 datapoint.row[pred_name] = pred
 
     # Save
-    with open(args.preds_path, 'w') as f:
+    with open(args.preds_path, 'w', newline='') as f: #ZL: This is for windows
         writer = csv.DictWriter(f, fieldnames=full_data[0].row.keys())
         writer.writeheader()
 

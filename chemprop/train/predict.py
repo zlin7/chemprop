@@ -10,7 +10,8 @@ from chemprop.models import MoleculeModel
 def predict(model: MoleculeModel,
             data_loader: MoleculeDataLoader,
             disable_progress_bar: bool = False,
-            scaler: StandardScaler = None) -> List[List[float]]:
+            scaler: StandardScaler = None,
+            embed_only=False) -> List[List[float]]:
     """
     Makes predictions on a dataset using an ensemble of models.
 
@@ -18,6 +19,7 @@ def predict(model: MoleculeModel,
     :param data_loader: A :class:`~chemprop.data.data.MoleculeDataLoader`.
     :param disable_progress_bar: Whether to disable the progress bar.
     :param scaler: A :class:`~chemprop.features.scaler.StandardScaler` object fit on the training targets.
+    :param embed_only=False: whether to return the feature from the last layer or full prediction
     :return: A list of lists of predictions. The outer list is molecules while the inner list is tasks.
     """
     model.eval()
@@ -32,13 +34,14 @@ def predict(model: MoleculeModel,
 
         # Make predictions
         with torch.no_grad():
+            kwargs = {'embed_only': embed_only} if embed_only else {}
             batch_preds = model(mol_batch, features_batch, atom_descriptors_batch,
-                                atom_features_batch, bond_features_batch)
+                                atom_features_batch, bond_features_batch, **kwargs)
 
         batch_preds = batch_preds.data.cpu().numpy()
 
         # Inverse scale if regression
-        if scaler is not None:
+        if scaler is not None and not embed_only:
             batch_preds = scaler.inverse_transform(batch_preds)
 
         # Collect vectors

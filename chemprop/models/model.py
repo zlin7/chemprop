@@ -11,6 +11,7 @@ from chemprop.features import BatchMolGraph
 from chemprop.nn_utils import get_activation_function, initialize_weights
 
 
+import ipdb
 class MoleculeModel(nn.Module):
     """A :class:`MoleculeModel` is a model which contains a message passing network following by feed-forward layers."""
 
@@ -139,7 +140,8 @@ class MoleculeModel(nn.Module):
                 features_batch: List[np.ndarray] = None,
                 atom_descriptors_batch: List[np.ndarray] = None,
                 atom_features_batch: List[np.ndarray] = None,
-                bond_features_batch: List[np.ndarray] = None) -> torch.FloatTensor:
+                bond_features_batch: List[np.ndarray] = None,
+                embed_only=False) -> torch.FloatTensor:
         """
         Runs the :class:`MoleculeModel` on input.
 
@@ -149,15 +151,19 @@ class MoleculeModel(nn.Module):
         :param atom_descriptors_batch: A list of numpy arrays containing additional atom descriptors.
         :param atom_features_batch: A list of numpy arrays containing additional atom features.
         :param bond_features_batch: A list of numpy arrays containing additional bond features.
+        :param embed_only=False: return the last layer embedding or not
         :return: The output of the :class:`MoleculeModel`, which is either property predictions
                  or molecule features if :code:`self.featurizer=True`.
         """
         if self.featurizer:
             return self.featurize(batch, features_batch, atom_descriptors_batch,
                                   atom_features_batch, bond_features_batch)
-
-        output = self.ffn(self.encoder(batch, features_batch, atom_descriptors_batch,
-                                       atom_features_batch, bond_features_batch))
+        encoded = self.encoder(batch, features_batch, atom_descriptors_batch,
+                                       atom_features_batch, bond_features_batch)
+        if embed_only:
+            assert not self.training, "Only extract embedding in the evaluation mode"
+            return self.ffn[:-1](encoded)
+        output = self.ffn(encoded)
 
         # Don't apply sigmoid during training b/c using BCEWithLogitsLoss
         if self.classification and not self.training:

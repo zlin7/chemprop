@@ -355,6 +355,8 @@ class TrainArgs(CommonArgs):
 
     def __init__(self, *args, **kwargs) -> None:
         super(TrainArgs, self).__init__(*args, **kwargs)
+        #import ipdb
+        #ipdb.set_trace()
         self._task_names = None
         self._crossval_index_sets = None
         self._task_names = None
@@ -564,6 +566,8 @@ class PredictArgs(CommonArgs):
     """Whether to drop all columns from the test data file besides the SMILES columns and the new prediction columns."""
     ensemble_variance: bool = False
     """Whether to calculate the variance of ensembles as a measure of epistemic uncertainty. If True, the variance is saved as an additional column for each target in the preds_path."""
+    embed_only: bool = False
+    """Whether to save the last layer embedding, instead of the prediction"""
 
     @property
     def ensemble_size(self) -> int:

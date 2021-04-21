@@ -10,6 +10,7 @@ from chemprop.args import PredictArgs, TrainArgs
 from chemprop.data import get_data, get_data_from_smiles, MoleculeDataLoader, MoleculeDataset
 from chemprop.utils import load_args, load_checkpoint, load_scalers, makedirs, timeit, update_prediction_args
 from chemprop.features import set_extra_atom_fdim, set_extra_bond_fdim
+import ipdb
 
 @timeit()
 def make_predictions(args: PredictArgs, smiles: List[List[str]] = None) -> List[List[Optional[float]]]:
@@ -168,6 +169,17 @@ def make_predictions(args: PredictArgs, smiles: List[List[str]] = None) -> List[
 
         for datapoint in full_data:
             writer.writerow(datapoint.row)
+
+    if args.readout_weight_path is not None:
+        import torch, os
+        #readout = torch.nn.Linear(model.ffn[4].in_features, model.ffn[4].out_features)
+        #readout.weight.data = model.ffn[4].weight.data.clone().cpu()
+        #readout.bias.data = model.ffn[4].bias.clone().cpu()
+        readout = model.ffn[4].to('cpu')
+        readout.weight.data *= torch.tensor(scaler.stds).unsqueeze(1)
+        readout.bias.data *= torch.tensor(scaler.stds)
+        readout.bias.data += torch.tensor(scaler.means)
+        torch.save(readout, args.readout_weight_path)
 
     return avg_preds
 

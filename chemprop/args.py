@@ -568,6 +568,7 @@ class PredictArgs(CommonArgs):
     """Whether to calculate the variance of ensembles as a measure of epistemic uncertainty. If True, the variance is saved as an additional column for each target in the preds_path."""
     embed_only: bool = False
     """Whether to save the last layer embedding, instead of the prediction"""
+    readout_weight_path: str = None
 
     @property
     def ensemble_size(self) -> int:

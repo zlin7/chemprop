@@ -218,8 +218,9 @@ def run_training(args: TrainArgs,
         # Run training
         best_score = float('inf') if args.minimize_score else -float('inf')
         best_epoch, n_iter = 0, 0
-        for epoch in trange(args.epochs):
+        for epoch in range(args.epochs):
             debug(f'Epoch {epoch}')
+            print(f"Epoch {epoch}")
 
             n_iter = train(
                 model=model,
@@ -230,7 +231,8 @@ def run_training(args: TrainArgs,
                 args=args,
                 n_iter=n_iter,
                 logger=logger,
-                writer=writer
+                writer=writer,
+                tqdmkwargs={}
             )
             if isinstance(scheduler, ExponentialLR):
                 scheduler.step()
@@ -241,7 +243,8 @@ def run_training(args: TrainArgs,
                 metrics=args.metrics,
                 dataset_type=args.dataset_type,
                 scaler=scaler,
-                logger=logger
+                logger=logger,
+                tqdmkwargs={}
             )
 
             for metric, scores in val_scores.items():

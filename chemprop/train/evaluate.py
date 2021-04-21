@@ -81,7 +81,8 @@ def evaluate(model: MoleculeModel,
              metrics: List[str],
              dataset_type: str,
              scaler: StandardScaler = None,
-             logger: logging.Logger = None) -> Dict[str, List[float]]:
+             logger: logging.Logger = None,
+             tqdmkwargs={'leave': False}) -> Dict[str, List[float]]:
     """
     Evaluates an ensemble of models on a dataset by making predictions and then evaluating the predictions.
 
@@ -98,7 +99,8 @@ def evaluate(model: MoleculeModel,
     preds = predict(
         model=model,
         data_loader=data_loader,
-        scaler=scaler
+        scaler=scaler,
+        tqdmkwargs=tqdmkwargs
     )
 
     results = evaluate_predictions(

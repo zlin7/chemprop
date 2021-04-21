@@ -11,7 +11,8 @@ def predict(model: MoleculeModel,
             data_loader: MoleculeDataLoader,
             disable_progress_bar: bool = False,
             scaler: StandardScaler = None,
-            embed_only=False) -> List[List[float]]:
+            embed_only=False,
+            tqdmkwargs={'leave': False}) -> List[List[float]]:
     """
     Makes predictions on a dataset using an ensemble of models.
 
@@ -26,7 +27,7 @@ def predict(model: MoleculeModel,
 
     preds = []
 
-    for batch in tqdm(data_loader, disable=disable_progress_bar, leave=False):
+    for batch in tqdm(data_loader, disable=disable_progress_bar, **tqdmkwargs):
         # Prepare batch
         batch: MoleculeDataset
         mol_batch, features_batch, atom_descriptors_batch, atom_features_batch, bond_features_batch = \

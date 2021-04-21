@@ -79,7 +79,9 @@ def make_predictions(args: PredictArgs, smiles: List[List[str]] = None) -> List[
         all_preds = []
 
     print(f'Predicting with an ensemble of {len(args.checkpoint_paths)} models')
-    for index, checkpoint_path in enumerate(tqdm(args.checkpoint_paths, total=len(args.checkpoint_paths))):
+    #for index, checkpoint_path in enumerate(tqdm(args.checkpoint_paths, total=len(args.checkpoint_paths))):
+    for index, checkpoint_path in enumerate(args.checkpoint_paths):
+        print("Working on %d:{%s}"%(index, checkpoint_path))
         # Load model and scalers
         model = load_checkpoint(checkpoint_path, device=args.device)
         scaler, features_scaler, atom_descriptor_scaler, bond_feature_scaler = load_scalers(checkpoint_path)
@@ -100,6 +102,7 @@ def make_predictions(args: PredictArgs, smiles: List[List[str]] = None) -> List[
             data_loader=test_data_loader,
             scaler=scaler,
             embed_only=args.embed_only,
+            tqdmkwargs={},
         )
         model_preds = np.array(model_preds)
         if sum_preds is None:

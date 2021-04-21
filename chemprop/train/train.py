@@ -22,7 +22,8 @@ def train(model: MoleculeModel,
           args: TrainArgs,
           n_iter: int = 0,
           logger: logging.Logger = None,
-          writer: SummaryWriter = None) -> int:
+          writer: SummaryWriter = None,
+          tqdmkwargs={'leave': False}) -> int:
     """
     Trains a model for an epoch.
 
@@ -42,7 +43,7 @@ def train(model: MoleculeModel,
     model.train()
     loss_sum = iter_count = 0
 
-    for batch in tqdm(data_loader, total=len(data_loader), leave=False):
+    for batch in tqdm(data_loader, total=len(data_loader), **tqdmkwargs):
         # Prepare batch
         batch: MoleculeDataset
         mol_batch, features_batch, target_batch, atom_descriptors_batch, atom_features_batch, bond_features_batch = \

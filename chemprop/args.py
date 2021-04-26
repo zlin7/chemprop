@@ -205,7 +205,7 @@ class TrainArgs(CommonArgs):
     """:class:`TrainArgs` includes :class:`CommonArgs` along with additional arguments used for training a Chemprop model."""
 
     # General arguments
-    data_path: str
+    data_path: str = None
     """Path to data CSV file."""
     target_columns: List[str] = None
     """
@@ -441,7 +441,7 @@ class TrainArgs(CommonArgs):
         super(TrainArgs, self).process_args()
 
         global temp_dir  # Prevents the temporary directory from being deleted upon function return
-
+        if self.data_path == 'None': self.data_path = None
         # Process SMILES columns
         self.smiles_columns = chemprop.data.utils.preprocess_smiles_columns(
             path=self.data_path,
@@ -577,7 +577,7 @@ class PredictArgs(CommonArgs):
 
     def process_args(self) -> None:
         super(PredictArgs, self).process_args()
-
+        if self.readout_weight_path == 'None': self.readout_weight_path = None
         self.smiles_columns = chemprop.data.utils.preprocess_smiles_columns(
             path=self.test_path,
             smiles_columns=self.smiles_columns,

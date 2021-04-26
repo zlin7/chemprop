@@ -3,6 +3,7 @@ import csv
 from typing import List, Optional, Union
 
 import numpy as np
+import os
 from tqdm import tqdm
 
 from .predict import predict
@@ -163,15 +164,15 @@ def make_predictions(args: PredictArgs, smiles: List[List[str]] = None) -> List[
                 datapoint.row[pred_name] = pred
 
     # Save
-    with open(args.preds_path, 'w', newline='') as f: #ZL: This is for windows
+    with open(args.preds_path, 'w', newline='' if os.name == 'nt' else None) as f: #ZL: This is for windows
         writer = csv.DictWriter(f, fieldnames=full_data[0].row.keys())
         writer.writeheader()
 
         for datapoint in full_data:
             writer.writerow(datapoint.row)
 
-    if args.readout_weight_path is not None:
-        import torch, os
+    if args.readout_weight_path is not None and args.readout_weight_path != "None":
+        import torch
         #readout = torch.nn.Linear(model.ffn[4].in_features, model.ffn[4].out_features)
         #readout.weight.data = model.ffn[4].weight.data.clone().cpu()
         #readout.bias.data = model.ffn[4].bias.clone().cpu()

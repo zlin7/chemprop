@@ -32,7 +32,7 @@ def preprocess_smiles_columns(path: str,
     """
 
     if smiles_columns is None:
-        if os.path.isfile(path):
+        if path is not None and os.path.isfile(path):
             columns = get_header(path)
             smiles_columns = columns[:number_of_molecules]
         else:
@@ -40,7 +40,7 @@ def preprocess_smiles_columns(path: str,
     else:
         if not isinstance(smiles_columns,list):
             smiles_columns=[smiles_columns]
-        if os.path.isfile(path):
+        if path is not None and os.path.isfile(path):
             columns = get_header(path)
             if len(smiles_columns) != number_of_molecules:
                 raise ValueError('Length of smiles_columns must match number_of_molecules.')

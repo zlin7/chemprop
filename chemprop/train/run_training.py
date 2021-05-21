@@ -19,7 +19,7 @@ from chemprop.models import MoleculeModel
 from chemprop.nn_utils import param_count
 from chemprop.utils import build_optimizer, build_lr_scheduler, get_loss_func, load_checkpoint, makedirs, \
     save_checkpoint, save_smiles_splits
-
+import ipdb
 
 def run_training(args: TrainArgs,
                  data: MoleculeDataset,
@@ -147,6 +147,8 @@ def run_training(args: TrainArgs,
     test_smiles, test_targets = test_data.smiles(), test_data.targets()
     if args.dataset_type == 'multiclass':
         sum_test_preds = np.zeros((len(test_smiles), args.num_tasks, args.multiclass_num_classes))
+    elif args.dataset_type == 'quantile_regression':
+        sum_test_preds = np.zeros((len(test_smiles), args.num_tasks * 2))
     else:
         sum_test_preds = np.zeros((len(test_smiles), args.num_tasks))
 
@@ -326,9 +328,13 @@ def run_training(args: TrainArgs,
     # Optionally save test preds
     if args.save_preds:
         test_preds_dataframe = pd.DataFrame(data={'smiles': test_data.smiles()})
-
-        for i, task_name in enumerate(args.task_names):
-            test_preds_dataframe[task_name] = [pred[i] for pred in avg_test_preds]
+        if args.dataset_type == 'quantile_regression':
+            for i, task_name in enumerate(args.task_names):
+                test_preds_dataframe['%s_lo' % task_name] = [pred[i] for pred in avg_test_preds]
+                test_preds_dataframe['%s_hi' % task_name] = [pred[i + args.num_tasks] for pred in avg_test_preds]
+        else:
+            for i, task_name in enumerate(args.task_names):
+                test_preds_dataframe[task_name] = [pred[i] for pred in avg_test_preds]
 
         test_preds_dataframe.to_csv(os.path.join(args.save_dir, 'test_preds.csv'), index=False)
 

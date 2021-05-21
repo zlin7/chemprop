@@ -160,8 +160,15 @@ def make_predictions(args: PredictArgs, smiles: List[List[str]] = None) -> List[
             datapoint.row = {'smiles': datapoint.row['smiles']}
             datapoint.row.update({i: v for i,v in enumerate(preds)})
         else:
-            for pred_name, pred in zip(task_names, preds):
-                datapoint.row[pred_name] = pred
+            if args.dataset_type == 'quantile_regression':
+                assert len(task_names) * 2 == len(preds)
+                for i, pred_name in enumerate(task_names):
+                    datapoint.row['%s_lo'%pred_name] = preds[i]
+                    datapoint.row['%s_hi'%pred_name] = preds[i + len(task_names)]
+                    datapoint.row[pred_name] = (preds[i] + preds[i + len(task_names)]) / 2.
+            else:
+                for pred_name, pred in zip(task_names, preds):
+                    datapoint.row[pred_name] = pred
 
     # Save
     with open(args.preds_path, 'w', newline='' if os.name == 'nt' else None) as f: #ZL: This is for windows
@@ -177,9 +184,10 @@ def make_predictions(args: PredictArgs, smiles: List[List[str]] = None) -> List[
         #readout.weight.data = model.ffn[4].weight.data.clone().cpu()
         #readout.bias.data = model.ffn[4].bias.clone().cpu()
         readout = model.ffn[4].to('cpu')
-        readout.weight.data *= torch.tensor(scaler.stds).unsqueeze(1)
-        readout.bias.data *= torch.tensor(scaler.stds)
-        readout.bias.data += torch.tensor(scaler.means)
+        if scaler is not None:
+            readout.weight.data *= torch.tensor(scaler.stds).unsqueeze(1)
+            readout.bias.data *= torch.tensor(scaler.stds)
+            readout.bias.data += torch.tensor(scaler.means)
         torch.save(readout, args.readout_weight_path)
 
     return avg_preds

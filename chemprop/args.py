@@ -13,7 +13,8 @@ from chemprop.data import set_cache_mol
 from chemprop.features import get_available_features_generators
 
 
-Metric = Literal['auc', 'prc-auc', 'rmse', 'mae', 'mse', 'r2', 'accuracy', 'cross_entropy', 'binary_cross_entropy']
+Metric = Literal['auc', 'prc-auc', 'rmse', 'mae', 'mse', 'r2', 'accuracy', 'cross_entropy', 'binary_cross_entropy',
+                 'pinball_10', 'pinball_50']
 
 
 def get_checkpoint_paths(checkpoint_path: Optional[str] = None,
@@ -214,7 +215,7 @@ class TrainArgs(CommonArgs):
     """
     ignore_columns: List[str] = None
     """Name of the columns to ignore when :code:`target_columns` is not provided."""
-    dataset_type: Literal['regression', 'classification', 'multiclass']
+    dataset_type: Literal['regression', 'classification', 'multiclass', 'quantile_regression']
     """Type of dataset. This determines the loss function used during training."""
     multiclass_num_classes: int = 3
     """Number of classes when running multiclass classification."""
@@ -353,6 +354,9 @@ class TrainArgs(CommonArgs):
     no_bond_features_scaling: bool = False
     """Turn off atom feature scaling."""
 
+    #TODO: Zhen
+    alpha: float = None
+
     def __init__(self, *args, **kwargs) -> None:
         super(TrainArgs, self).__init__(*args, **kwargs)
         #import ipdb
@@ -465,12 +469,14 @@ class TrainArgs(CommonArgs):
         if self.checkpoint_paths is not None and len(self.checkpoint_paths) > 0:
             self.ensemble_size = len(self.checkpoint_paths)
 
-        # Process and validate metric and loss function
+        # Process and validate metric and loss function #TODO: Add for quantile_regression
         if self.metric is None:
             if self.dataset_type == 'classification':
                 self.metric = 'auc'
             elif self.dataset_type == 'multiclass':
                 self.metric = 'cross_entropy'
+            elif self.dataset_type == 'quantile_regression':
+                self.metric = 'pinball_%d'%(int(100*self.alpha))
             else:
                 self.metric = 'rmse'
 
@@ -481,6 +487,7 @@ class TrainArgs(CommonArgs):
         for metric in self.metrics:
             if not ((self.dataset_type == 'classification' and metric in ['auc', 'prc-auc', 'accuracy', 'binary_cross_entropy']) or
                     (self.dataset_type == 'regression' and metric in ['rmse', 'mae', 'mse', 'r2']) or
+                    (self.dataset_type == 'quantile_regression' and metric in ['pinball_50', 'pinball_10']) or
                     (self.dataset_type == 'multiclass' and metric in ['cross_entropy', 'accuracy'])):
                 raise ValueError(f'Metric "{metric}" invalid for dataset type "{self.dataset_type}".')
 
@@ -569,6 +576,9 @@ class PredictArgs(CommonArgs):
     embed_only: bool = False
     """Whether to save the last layer embedding, instead of the prediction"""
     readout_weight_path: str = None
+
+    #dataset_type: Literal['regression', 'classification', 'multiclass', 'quantile_regression']
+    #alpha: float = None
 
     @property
     def ensemble_size(self) -> int:

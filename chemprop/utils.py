@@ -201,6 +201,34 @@ def load_task_names(path: str) -> List[str]:
     return load_args(path).task_names
 
 
+class BiQuantilesLoss(nn.Module):
+    def __init__(self, alpha=0.1, reduction='mean'):
+        super(BiQuantilesLoss, self).__init__()
+        self.alpha = alpha
+        self.reduction = reduction
+        pass
+
+    def forward(self, y_pred, y):
+        if len(y.shape) == 1:
+            y = y.unsqueeze(1)
+        n_outputs = y.shape[1]
+        assert y_pred.shape[-1] == n_outputs * 2, "Has to be 2 quantile estimates"
+        lo_alpha = self.alpha / 2.
+        hi_alpha = 1-lo_alpha
+
+        diff_lo = y - y_pred[:, :n_outputs]
+        diff_hi = y - y_pred[:, n_outputs:]
+        dim = len(y.shape)
+        loss_lo = torch.stack([lo_alpha * diff_lo, (1 - lo_alpha) * (-diff_lo)], dim).max(dim)[0]
+        loss_hi = torch.stack([hi_alpha * diff_hi, (1 - hi_alpha) * (-diff_hi)], dim).max(dim)[0]
+        loss = (loss_lo + loss_hi)
+        if self.reduction == 'mean':
+            return loss.mean()
+        if self.reduction == 'none':
+            return loss
+        if self.reduction == 'sum':
+            return loss.sum()
+
 def get_loss_func(args: TrainArgs) -> nn.Module:
     """
     Gets the loss function corresponding to a given dataset type.
@@ -216,6 +244,9 @@ def get_loss_func(args: TrainArgs) -> nn.Module:
 
     if args.dataset_type == 'multiclass':
         return nn.CrossEntropyLoss(reduction='none')
+
+    if args.dataset_type == 'quantile_regression':
+        return BiQuantilesLoss(alpha=args.alpha, reduction='none')
 
     raise ValueError(f'Dataset type "{args.dataset_type}" not supported.')
 
@@ -268,6 +299,23 @@ def mse(targets: List[float], preds: List[float]) -> float:
     """
     return mean_squared_error(targets, preds)
 
+
+def pinball(targets: List[float], preds: List[float], alpha: float) -> float:
+    """
+    Computes the mean squared error.
+
+    :param targets: A list of targets.
+    :param preds: A list of predictions.
+    :return: The computed mse.
+    """
+    with torch.no_grad():
+        loss = BiQuantilesLoss(alpha=alpha)(torch.tensor(preds), torch.tensor(targets))
+        return float(loss)
+
+def pinball_50(targets: List[float], preds: List[float]) -> float:
+    return pinball(targets, preds, 0.5)
+def pinball_10(targets: List[float], preds: List[float]) -> float:
+    return pinball(targets, preds, 0.1)
 
 def accuracy(targets: List[int], preds: Union[List[float], List[List[float]]], threshold: float = 0.5) -> float:
     """
@@ -333,7 +381,10 @@ def get_metric_func(metric: str) -> Callable[[Union[List[int], List[float]], Lis
 
     if metric == 'binary_cross_entropy':
         return bce
-
+    if metric == 'pinball_10':
+        return pinball_10
+    if metric == 'pinball_50':
+        return pinball_50
     raise ValueError(f'Metric "{metric}" not supported.')
 
 
@@ -561,7 +612,10 @@ def update_prediction_args(predict_args: PredictArgs,
             'atom_descriptors_scaling':False,
             'no_atom_descriptors_scaling':True,
         }
-        default_train_args=TrainArgs().parse_args(['--data_path', None, '--dataset_type', str(train_args.dataset_type)])
+        if train_args.dataset_type == 'quantile_regression':
+            default_train_args = TrainArgs().parse_args(['--data_path', None, '--dataset_type', str(train_args.dataset_type), '--alpha', str(train_args.alpha)])
+        else:
+            default_train_args=TrainArgs().parse_args(['--data_path', None, '--dataset_type', str(train_args.dataset_type)])
         for key, value in vars(default_train_args).items():
             if not hasattr(predict_args,key):
                 setattr(predict_args,key,override_defaults.get(key,value))

@@ -6,7 +6,7 @@ from .predict import predict
 from chemprop.data import MoleculeDataLoader, StandardScaler
 from chemprop.models import MoleculeModel
 from chemprop.utils import get_metric_func
-
+import ipdb
 
 def evaluate_predictions(preds: List[List[float]],
                          targets: List[List[float]],
@@ -39,8 +39,11 @@ def evaluate_predictions(preds: List[List[float]],
     for i in range(num_tasks):
         for j in range(len(preds)):
             if targets[j][i] is not None:  # Skip those without targets
-                valid_preds[i].append(preds[j][i])
                 valid_targets[i].append(targets[j][i])
+                if dataset_type == 'quantile_regression':
+                    valid_preds[i].append([preds[j][i], preds[j][i + num_tasks]])
+                else:
+                    valid_preds[i].append(preds[j][i])
 
     # Compute metric
     results = defaultdict(list)

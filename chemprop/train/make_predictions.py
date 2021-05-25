@@ -166,6 +166,11 @@ def make_predictions(args: PredictArgs, smiles: List[List[str]] = None) -> List[
                     datapoint.row['%s_lo'%pred_name] = preds[i]
                     datapoint.row['%s_hi'%pred_name] = preds[i + len(task_names)]
                     datapoint.row[pred_name] = (preds[i] + preds[i + len(task_names)]) / 2.
+            elif args.dataset_type == 'nll_regression':
+                assert len(task_names) * 2 == len(preds)
+                for i, pred_name in enumerate(task_names):
+                    datapoint.row[pred_name] = preds[i]
+                    datapoint.row['%s_sigma2'%pred_name] = preds[i + len(task_names)]
             else:
                 for pred_name, pred in zip(task_names, preds):
                     datapoint.row[pred_name] = pred

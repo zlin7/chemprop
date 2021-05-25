@@ -215,7 +215,7 @@ class TrainArgs(CommonArgs):
     """
     ignore_columns: List[str] = None
     """Name of the columns to ignore when :code:`target_columns` is not provided."""
-    dataset_type: Literal['regression', 'classification', 'multiclass', 'quantile_regression']
+    dataset_type: Literal['regression', 'classification', 'multiclass', 'quantile_regression', 'nll_regression']
     """Type of dataset. This determines the loss function used during training."""
     multiclass_num_classes: int = 3
     """Number of classes when running multiclass classification."""
@@ -477,6 +477,8 @@ class TrainArgs(CommonArgs):
                 self.metric = 'cross_entropy'
             elif self.dataset_type == 'quantile_regression':
                 self.metric = 'pinball_%d'%(int(100*self.alpha))
+            elif self.dataset_type == 'nll_regression':
+                self.metric = 'nll_regression'
             else:
                 self.metric = 'rmse'
 
@@ -488,6 +490,7 @@ class TrainArgs(CommonArgs):
             if not ((self.dataset_type == 'classification' and metric in ['auc', 'prc-auc', 'accuracy', 'binary_cross_entropy']) or
                     (self.dataset_type == 'regression' and metric in ['rmse', 'mae', 'mse', 'r2']) or
                     (self.dataset_type == 'quantile_regression' and metric in ['pinball_50', 'pinball_10']) or
+                    (self.dataset_type == 'nll_regression' and metric in ['nll_regression']) or
                     (self.dataset_type == 'multiclass' and metric in ['cross_entropy', 'accuracy'])):
                 raise ValueError(f'Metric "{metric}" invalid for dataset type "{self.dataset_type}".')
 

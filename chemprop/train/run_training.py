@@ -149,6 +149,8 @@ def run_training(args: TrainArgs,
         sum_test_preds = np.zeros((len(test_smiles), args.num_tasks, args.multiclass_num_classes))
     elif args.dataset_type == 'quantile_regression':
         sum_test_preds = np.zeros((len(test_smiles), args.num_tasks * 2))
+    elif args.dataset_type == 'nll_regression':
+        sum_test_preds = np.zeros((len(test_smiles), args.num_tasks * 2))
     else:
         sum_test_preds = np.zeros((len(test_smiles), args.num_tasks))
 
@@ -332,6 +334,10 @@ def run_training(args: TrainArgs,
             for i, task_name in enumerate(args.task_names):
                 test_preds_dataframe['%s_lo' % task_name] = [pred[i] for pred in avg_test_preds]
                 test_preds_dataframe['%s_hi' % task_name] = [pred[i + args.num_tasks] for pred in avg_test_preds]
+        elif args.dataset_type == 'nll_regression':
+            for i, task_name in enumerate(args.task_names):
+                test_preds_dataframe[task_name] = [pred[i] for pred in avg_test_preds]
+                test_preds_dataframe['%s_sigma2' % task_name] = [pred[i + args.num_tasks] for pred in avg_test_preds]
         else:
             for i, task_name in enumerate(args.task_names):
                 test_preds_dataframe[task_name] = [pred[i] for pred in avg_test_preds]

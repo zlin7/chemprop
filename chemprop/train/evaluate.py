@@ -40,7 +40,7 @@ def evaluate_predictions(preds: List[List[float]],
         for j in range(len(preds)):
             if targets[j][i] is not None:  # Skip those without targets
                 valid_targets[i].append(targets[j][i])
-                if dataset_type == 'quantile_regression':
+                if dataset_type == 'quantile_regression' or dataset_type == 'nll_regression':
                     valid_preds[i].append([preds[j][i], preds[j][i + num_tasks]])
                 else:
                     valid_preds[i].append(preds[j][i])

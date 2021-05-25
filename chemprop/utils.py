@@ -229,6 +229,30 @@ class BiQuantilesLoss(nn.Module):
         if self.reduction == 'sum':
             return loss.sum()
 
+class NLLRegressionLoss(nn.Module):
+    def __init__(self, reduction='mean', eps=1e-5):
+        super(NLLRegressionLoss, self).__init__()
+        self.reduction = reduction
+        self.eps = eps
+
+    def forward(self, y_pred, y):
+        if len(y.shape) == 1:
+            y = y.unsqueeze(1)
+        n_outputs = y.shape[1]
+        assert y_pred.shape[-1] == n_outputs * 2, "Has to be 2 quantile estimates"
+
+        mu = y - y_pred[:, :n_outputs]
+        sigma_sq = y - y_pred[:, n_outputs:]
+        sigma_sq_pos = torch.abs(sigma_sq) + self.eps
+
+        loss = torch.log(sigma_sq_pos)
+        loss += torch.div(torch.square(y - mu), sigma_sq_pos)
+        if self.reduction == 'mean':
+            return loss.mean()
+        if self.reduction == 'sum':
+            return loss.sum()
+        return loss
+
 def get_loss_func(args: TrainArgs) -> nn.Module:
     """
     Gets the loss function corresponding to a given dataset type.
@@ -247,6 +271,9 @@ def get_loss_func(args: TrainArgs) -> nn.Module:
 
     if args.dataset_type == 'quantile_regression':
         return BiQuantilesLoss(alpha=args.alpha, reduction='none')
+
+    if args.dataset_type == 'nll_regression':
+        return NLLRegressionLoss(reduction='none')
 
     raise ValueError(f'Dataset type "{args.dataset_type}" not supported.')
 
@@ -317,6 +344,12 @@ def pinball_50(targets: List[float], preds: List[float]) -> float:
 def pinball_10(targets: List[float], preds: List[float]) -> float:
     return pinball(targets, preds, 0.1)
 
+
+def nll_regression_loss(targets: List[float], preds: List[float]) -> float:
+    with torch.no_grad():
+        loss = NLLRegressionLoss()(torch.tensor(preds), torch.tensor(targets))
+        return float(loss)
+
 def accuracy(targets: List[int], preds: Union[List[float], List[List[float]]], threshold: float = 0.5) -> float:
     """
     Computes the accuracy of a binary prediction task using a given threshold for generating hard predictions.
@@ -385,6 +418,8 @@ def get_metric_func(metric: str) -> Callable[[Union[List[int], List[float]], Lis
         return pinball_10
     if metric == 'pinball_50':
         return pinball_50
+    if metric == 'nll_regression':
+        return nll_regression_loss
     raise ValueError(f'Metric "{metric}" not supported.')
 
 

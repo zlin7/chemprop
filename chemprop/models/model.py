@@ -26,12 +26,11 @@ class MoleculeModel(nn.Module):
 
         self.classification = args.dataset_type == 'classification'
         self.multiclass = args.dataset_type == 'multiclass'
-        self.quantile_regression = args.dataset_type == 'quantile_regression'
         self.featurizer = featurizer
 
         self.output_size = args.num_tasks
-        if self.quantile_regression:
-            self.output_size *= 2
+        if args.dataset_type == 'quantile_regression' or args.dataset_type == 'nll_regression':
+            self.output_size = args.num_tasks * 2
         if self.multiclass:
             self.output_size *= args.multiclass_num_classes
 
